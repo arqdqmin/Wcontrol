@@ -142,7 +142,7 @@ function mostrarImpresionLiq() {
   const mesNombre = MESES_NOMBRES[mesActualLiq];
 
   const logoHtml = (empresaCache && empresaCache.logo_url)
-    ? `<img src="${empresaCache.logo_url}" alt="Logo" style="width:100%;height:100%;object-fit:contain;" />`
+    ? `<img src="${empresaCache.logo_url}" alt="Logo" style="width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;display:block;" />`
     : 'LOGO';
 
   const html = `

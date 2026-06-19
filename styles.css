@@ -189,7 +189,7 @@ input[type="checkbox"] { width: auto !important; accent-color: #1a1a1a; cursor: 
 
 .liq-wrap { background: #fff; border: 1px solid #e0e0da; border-radius: 12px; padding: 28px; }
 .liq-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 6px; }
-.liq-logo { width: 48px; height: 48px; border: 1px solid #e0e0da; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; flex-shrink: 0; }
+.liq-logo { width: 48px; height: 48px; min-width: 48px; max-width: 48px; min-height: 48px; max-height: 48px; overflow: hidden; border: 1px solid #e0e0da; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; flex-shrink: 0; }
 .liq-empresa-nombre { font-size: 14px; font-weight: 700; }
 .liq-empresa-dir { font-size: 12px; color: #777; margin-top: 2px; }
 .liq-titulo { text-align: center; font-size: 17px; font-weight: 700; margin: 16px 0; padding: 10px 0; border-top: 1px solid #e0e0da; border-bottom: 1px solid #e0e0da; }

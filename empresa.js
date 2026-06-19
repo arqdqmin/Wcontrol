@@ -4,12 +4,25 @@
 
 var logoFileSeleccionado = null;
 
+const LOGO_IMG_STYLE = 'width:100%; height:100%; max-width:100%; max-height:100%; object-fit:contain; display:block;';
+
+function setLogoPreviewImg(src) {
+  const box = document.getElementById('emp-logo-preview');
+  if (!box) return;
+  box.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = src;
+  img.alt = 'Logo';
+  img.style.cssText = LOGO_IMG_STYLE;
+  box.appendChild(img);
+}
+
 function onLogoFileSelected() {
   const input = document.getElementById('emp-logo-file');
   logoFileSeleccionado = input.files[0] || null;
   if (logoFileSeleccionado) {
     const url = URL.createObjectURL(logoFileSeleccionado);
-    document.getElementById('emp-logo-preview').innerHTML = `<img src="${url}" alt="Logo" />`;
+    setLogoPreviewImg(url);
   }
 }
 
@@ -17,7 +30,7 @@ function renderLogoPreview() {
   const box = document.getElementById('emp-logo-preview');
   if (!box) return;
   if (empresaCache && empresaCache.logo_url) {
-    box.innerHTML = `<img src="${empresaCache.logo_url}" alt="Logo" />`;
+    setLogoPreviewImg(empresaCache.logo_url);
   } else {
     box.innerHTML = 'Sin logo';
   }

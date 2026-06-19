@@ -24,6 +24,40 @@ ambas pestañas.
 
 ## Novedades de esta versión
 
+- **Horas extra fuera del horario semanal contratado**: si un trabajador
+  trabaja un día que NO es parte de su horario semanal normal (por ejemplo,
+  vino en su día libre), esas horas ya no se usan para compensar horas de
+  descuento de esa semana — pasan completas y directas a la liquidación como
+  horas extra. Esto se distingue ahora en el "Resumen semanal" con la
+  columna "Extra fuera de horario".
+
+## Novedades de la versión anterior
+
+- **Nuevo tipo de día "Norm/Feriado"**: para un día que normalmente es
+  laboral pero cae en feriado. Las horas trabajadas ese día se pagan 100%
+  como hora extra, y si no se alcanzó a cubrir el horario habitual, esa
+  diferencia igual aparece como horas de descuento.
+- **Regla de colación**: si la permanencia total del día (de entrada a
+  salida real) es de 5 horas o menos, no se descuenta colación.
+- **Registro diario por semanas**: la tabla de asistencia ahora muestra un
+  separador por cada semana (lunes a domingo), y se agregó una sección
+  "Resumen semanal" — antes de "Datos para la liquidación" — con horas
+  normales, extra, descuento y el neto (extra − descuento) de cada semana.
+- **Compensación semanal de horas extra/descuento**: para cuadrar las horas
+  semanales del contrato, las horas extra de una semana solo cubren las
+  horas de descuento de esa misma semana. Si no alcanzan a cubrirlas, el
+  remanente de descuento pasa directo a la liquidación; si sobran extras
+  tras cubrir el descuento, esas pasan directo como extra. Esto reemplaza el
+  cálculo anterior (que sumaba todo el mes de corrido) tanto en el resumen
+  del mes como en lo que se autocompleta en Liquidación.
+
+> Nota: la regla de colación (punto 2) la apliqué solo al cálculo de horas
+> reales trabajadas en Asistencia, no al horario configurado en la ficha del
+> trabajador (Trabajadores → Configuración de jornada). Si también la
+> necesitas ahí, dime y la agrego.
+
+## Novedades de la versión anterior
+
 - **Pestaña Empresa** (nueva, en la barra superior): ahí están el RUT, nombre y
   dirección de la empresa, y el **logo** que aparece en las liquidaciones.
 - **Contrato en PDF**: en la ficha de cada trabajador puedes subir su

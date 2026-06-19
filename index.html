@@ -216,6 +216,7 @@
 
         <div class="card no-print-asis">
           <div class="section-title">Resumen del mes</div>
+          <p class="hint" style="margin-bottom:10px;">Las horas extra y descontadas ya están compensadas semana a semana (ver detalle abajo en "Resumen semanal").</p>
           <div class="resumen-grid">
             <div class="metric"><div class="metric-lbl">Días trabajados</div><div class="metric-val" id="ar-dias">0</div><div class="metric-sub">del mes</div></div>
             <div class="metric"><div class="metric-lbl">Horas normales</div><div class="metric-val" id="ar-hnorm">0</div><div class="metric-sub">hrs</div></div>
@@ -242,6 +243,23 @@
               </tr>
             </thead>
             <tbody id="a-tabla-dias"></tbody>
+          </table>
+        </div>
+
+        <div class="card" style="overflow-x:auto;">
+          <div class="section-title">Resumen semanal</div>
+          <p class="hint" style="margin-bottom:10px;">Las horas extra solo cubren horas de descuento dentro de la misma semana (lunes a domingo), para cuadrar las 42 hrs semanales. Si en una semana el descuento no queda cubierto por extras, ese remanente pasa directo a la liquidación como descuento; si sobran extras, pasan directo como extra.</p>
+          <table class="dias-table">
+            <thead>
+              <tr>
+                <th>Semana</th>
+                <th>Horas normales</th>
+                <th>Horas extra</th>
+                <th>Horas descuento</th>
+                <th>Extra − Descuento</th>
+              </tr>
+            </thead>
+            <tbody id="a-tabla-semanas"></tbody>
           </table>
         </div>
 

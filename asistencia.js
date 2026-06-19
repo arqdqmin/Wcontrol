@@ -70,7 +70,26 @@ async function cargarAsistencia() {
   cargarHistAsis(trabajadorId);
 }
 
+// ---------- SEMANAS (lunes a domingo) ----------
+function getLunesDeSemana(fechaStr) {
+  const [y, m, d] = fechaStr.split('-').map(Number);
+  const fecha = new Date(y, m - 1, d);
+  const diaSemana = fecha.getDay(); // 0=domingo..6=sábado
+  const diasDesdeLunes = (diaSemana + 6) % 7; // lunes=0
+  const lunes = new Date(fecha);
+  lunes.setDate(fecha.getDate() - diasDesdeLunes);
+  return lunes;
+}
+function fechaKeyLocal(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function fmtDateCorta(d) {
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
 // ---------- CÁLCULO POR DÍA ----------
+// Regla: si la permanencia total (entrada a salida real, sin descontar nada)
+// es <= 5 horas, la colación se considera 0.
 function computarDia(d) {
   if (d.tipo === 'ausente') {
     const esp = d.esperado ? Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60) : 0;
@@ -79,12 +98,24 @@ function computarDia(d) {
   if (d.tipo === 'libre' || d.tipo === 'feriado') {
     return { hrsNormales: 0, hrsExtra: 0, hrsDesc: 0 };
   }
-  const colacion = d.esperado ? (d.esperado.colacion || 0) : 0;
-  const horasReales = Math.max(0, horasEntreTiempos(d.entradaReal, d.salidaReal) - colacion / 60);
+
+  const permanenciaTotal = horasEntreTiempos(d.entradaReal, d.salidaReal);
+  const colacionConfigurada = d.esperado ? (d.esperado.colacion || 0) : 0;
+  const colacion = permanenciaTotal <= 5 ? 0 : colacionConfigurada;
+  const horasReales = Math.max(0, permanenciaTotal - colacion / 60);
 
   if (d.tipo === 'extra') {
     return { hrsNormales: 0, hrsExtra: horasReales, hrsDesc: 0 };
   }
+
+  if (d.tipo === 'normferiado') {
+    // Día normalmente laboral que cae en feriado: lo trabajado es 100% extra,
+    // y si no se cubre el horario esperado, esa diferencia igual se descuenta.
+    const horasEsperadas = d.esperado ? Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60) : 0;
+    const hrsDesc = Math.max(0, horasEsperadas - horasReales);
+    return { hrsNormales: 0, hrsExtra: horasReales, hrsDesc };
+  }
+
   // tipo === 'normal'
   if (!d.esperado) {
     // día sin horario contractual pero marcado como trabajado -> 100% extra
@@ -97,38 +128,89 @@ function computarDia(d) {
   return { hrsNormales: horasReales, hrsExtra: 0, hrsDesc: horasEsperadas - horasReales };
 }
 
+// ---------- RESUMEN SEMANAL (lunes a domingo) ----------
+// Las horas extra solo compensan horas de descuento DENTRO de la misma
+// semana. Si en una semana las extras no alcanzan a cubrir el descuento,
+// ese remanente de descuento pasa directo a la liquidación; si sobran
+// extras tras cubrir el descuento, esas pasan directo como extra.
+function computarSemanasAsis() {
+  const semanas = {};
+  diasDataAsis.forEach(d => {
+    const c = computarDia(d);
+    const lunes = getLunesDeSemana(d.fecha);
+    const key = fechaKeyLocal(lunes);
+    if (!semanas[key]) {
+      const domingo = new Date(lunes);
+      domingo.setDate(lunes.getDate() + 6);
+      semanas[key] = { key, lunes, domingo, normales: 0, extra: 0, desc: 0 };
+    }
+    semanas[key].normales += c.hrsNormales;
+    semanas[key].extra += c.hrsExtra;
+    semanas[key].desc += c.hrsDesc;
+  });
+  const ordenadas = Object.values(semanas).sort((a, b) => a.lunes - b.lunes);
+  ordenadas.forEach(s => {
+    s.neto = s.extra - s.desc;
+    s.extraFinal = Math.max(0, s.neto);
+    s.descFinal = Math.max(0, -s.neto);
+  });
+  return ordenadas;
+}
+
 function computarResumenAsis() {
-  let diasTrab = 0, hrsNorm = 0, hrsExt = 0, hrsAusCompletas = 0, hrsNoRealizadas = 0, diasAusentes = 0;
+  let diasTrab = 0, hrsNorm = 0, hrsAusCompletas = 0, hrsNoRealizadas = 0, diasAusentes = 0;
   diasDataAsis.forEach(d => {
     const c = computarDia(d);
     hrsNorm += c.hrsNormales;
-    hrsExt += c.hrsExtra;
     if (d.tipo === 'ausente') {
       hrsAusCompletas += c.hrsDesc;
       diasAusentes++;
     } else if (c.hrsDesc > 0) {
       hrsNoRealizadas += c.hrsDesc;
     }
-    if ((d.tipo === 'normal' || d.tipo === 'extra') && (c.hrsNormales + c.hrsExtra) > 0) diasTrab++;
+    if ((d.tipo === 'normal' || d.tipo === 'extra' || d.tipo === 'normferiado') && (c.hrsNormales + c.hrsExtra) > 0) diasTrab++;
   });
+
+  const semanas = computarSemanasAsis();
+  const hrsExt = semanas.reduce((s, w) => s + w.extraFinal, 0);
+  const hrsDescTotal = semanas.reduce((s, w) => s + w.descFinal, 0);
+
   const t = trabajadorActualAsis;
   const valHora = (t && t.hrs_semana) ? ((t.sueldo_base / 30) * 28) / (t.hrs_semana * 4) : 0;
-  const hrsDescTotal = hrsAusCompletas + hrsNoRealizadas;
-  return { diasTrab, hrsNorm, hrsExt, hrsAusCompletas, hrsNoRealizadas, hrsDescTotal, diasAusentes, valHora };
+
+  return {
+    diasTrab, hrsNorm, hrsExt, hrsAusCompletas, hrsNoRealizadas, hrsDescTotal, diasAusentes, valHora,
+    semanas: semanas.map(s => ({
+      lunes: fechaKeyLocal(s.lunes), domingo: fechaKeyLocal(s.domingo),
+      normales: s.normales, extra: s.extra, desc: s.desc, neto: s.neto,
+    })),
+  };
 }
 
 // ---------- RENDER TABLA ----------
-const TIPO_LABELS = { normal: 'Normal', extra: 'Extra', ausente: 'Ausente', libre: 'Libre', feriado: 'Feriado' };
-const TIPO_TAG_CLASS = { normal: 'tag-normal', extra: 'tag-extra', ausente: 'tag-ausente', libre: 'tag-libre', feriado: 'tag-feriado' };
+const TIPO_LABELS = { normal: 'Normal', extra: 'Extra', normferiado: 'Norm/Feriado', ausente: 'Ausente', libre: 'Libre', feriado: 'Feriado' };
+const TIPO_TAG_CLASS = { normal: 'tag-normal', extra: 'tag-extra', normferiado: 'tag-normferiado', ausente: 'tag-ausente', libre: 'tag-libre', feriado: 'tag-feriado' };
 
 function renderTablaAsis() {
   const tbody = document.getElementById('a-tabla-dias');
-  tbody.innerHTML = diasDataAsis.map((d, i) => {
+  let semanaActualKey = null;
+  let html = '';
+
+  diasDataAsis.forEach((d, i) => {
+    const lunes = getLunesDeSemana(d.fecha);
+    const key = fechaKeyLocal(lunes);
+    if (key !== semanaActualKey) {
+      semanaActualKey = key;
+      const domingo = new Date(lunes);
+      domingo.setDate(lunes.getDate() + 6);
+      html += `<tr class="semana-divisor"><td colspan="10">Semana del ${fmtDateCorta(lunes)} al ${fmtDateCorta(domingo)}</td></tr>`;
+    }
+
     const c = computarDia(d);
     const disabledTimes = (d.tipo === 'ausente' || d.tipo === 'libre' || d.tipo === 'feriado');
     const esperadoTxt = d.esperado ? `${d.esperado.entrada}–${d.esperado.salida}` : '—';
     const filaClase = d.tipo === 'ausente' ? 'fila-ausente' : (d.tipo === 'libre' || d.tipo === 'feriado' ? 'fila-libre' : '');
-    return `<tr class="${filaClase}">
+    html += `<tr class="${filaClase}">
       <td>${fmtDate(d.fecha)}</td>
       <td>${DIAS_CORTO[d.diaSemana]}</td>
       <td>
@@ -144,7 +226,9 @@ function renderTablaAsis() {
       <td>${c.hrsDesc > 0 ? `<span class="hrs-badge hrs-desc">${fmt2(c.hrsDesc)}</span>` : '—'}</td>
       <td><span class="tag-dia ${TIPO_TAG_CLASS[d.tipo]}">${TIPO_LABELS[d.tipo]}</span></td>
     </tr>`;
-  }).join('');
+  });
+
+  tbody.innerHTML = html;
 
   const r = computarResumenAsis();
   document.getElementById('ar-dias').textContent = r.diasTrab;
@@ -157,6 +241,30 @@ function renderTablaAsis() {
   document.getElementById('a-liq-val-hora').textContent = fmtPesos(r.valHora);
   document.getElementById('a-liq-hrs-ext').textContent = fmt2(r.hrsExt) + ' hrs';
   document.getElementById('a-liq-ausencias').textContent = r.diasAusentes + ' días';
+
+  renderResumenSemanal(r.semanas);
+}
+
+function renderResumenSemanal(semanas) {
+  const tbody = document.getElementById('a-tabla-semanas');
+  if (!tbody) return;
+  if (!semanas.length) {
+    tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color:#999;">Sin datos</td></tr>';
+    return;
+  }
+  tbody.innerHTML = semanas.map(s => {
+    const lunesD = new Date(s.lunes + 'T00:00:00');
+    const domingoD = new Date(s.domingo + 'T00:00:00');
+    const netoClase = s.neto >= 0 ? 'hrs-normal' : 'hrs-desc';
+    const netoTxto = (s.neto >= 0 ? '+' : '') + fmt2(s.neto);
+    return `<tr>
+      <td>${fmtDateCorta(lunesD)} – ${fmtDateCorta(domingoD)}</td>
+      <td>${fmt2(s.normales)}</td>
+      <td>${fmt2(s.extra)}</td>
+      <td>${fmt2(s.desc)}</td>
+      <td><span class="hrs-badge ${netoClase}">${netoTxto}</span></td>
+    </tr>`;
+  }).join('');
 }
 
 function cambiarTipoAsis(i, val) {

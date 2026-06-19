@@ -87,26 +87,53 @@ function fmtDateCorta(d) {
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0');
 }
 
-// ---------- CÁLCULO POR DÍA ----------
-// Regla 1: si la permanencia total (entrada a salida real) es <= 5 horas,
-// la colación se considera 0.
-// Regla 2: si el día NO es parte del horario semanal contratado del
-// trabajador (no hay "esperado" para ese día), todas las horas trabajadas
-// son "extra directa": NO se usan para compensar horas de descuento de la
-// semana, pasan completas y directas a la liquidación.
+// ---------- FUNCIÓN BASE DE CÁLCULO DIARIO ----------
+// Recibe la hora de entrada, hora de salida y la jornada teórica esperada
+// para ese día, y devuelve la permanencia, la colación a descontar, las
+// horas verdes (trabajo efectivo) y las horas rojas (deuda/descuento).
+//
+// Regla legal de colación (excepción para turnos cortos):
+//   - permanencia <= 5.0 horas  -> colacionADescuentar = 0.0
+//   - permanencia >  5.0 horas  -> colacionADescuentar = 1.0 (fija, NO la
+//     colación configurada en el horario del trabajador)
+// Nota: esta regla rige el cálculo de la asistencia REAL (turnos cortos).
+// El horario teórico/planificado del trabajador (Trabajadores → jornada)
+// sigue usando la colación que tú configuraste ahí.
+function calcularDiaTrabajo(horaEntrada, horaSalida, horasTeoricasMeta) {
+  // 2. Permanencia total (diferencia exacta en horas decimales)
+  const permanenciaTotal = horasEntreTiempos(horaEntrada, horaSalida);
+
+  // 3. Regla automática de colación
+  const colacionADescuentar = permanenciaTotal <= 5.0 ? 0.0 : 1.0;
+
+  // 4. Variables de salida
+  // Horas verdes: nunca pueden superar la permanencia física en el local.
+  const horasVerdes = Math.max(0, Math.min(permanenciaTotal, permanenciaTotal - colacionADescuentar));
+  let horasRojas = (horasTeoricasMeta || 0) - horasVerdes;
+  if (horasRojas < 0) horasRojas = 0.0; // las horas de más se manejan como extra, no acá
+
+  return { permanenciaTotal, colacionADescuentar, horasVerdes, horasRojas };
+}
+
+// ---------- CÁLCULO POR DÍA (usa calcularDiaTrabajo como motor) ----------
 function computarDia(d) {
   if (d.tipo === 'ausente') {
-    const esp = d.esperado ? Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60) : 0;
-    return { hrsNormales: 0, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: esp };
+    // Día completo de ausencia: se calcula cuánto habría correspondido
+    // trabajar ese día (con la misma regla de colación, aplicada al
+    // horario teórico completo), para fijar el descuento.
+    if (!d.esperado) return { hrsNormales: 0, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: 0 };
+    const calcTeorico = calcularDiaTrabajo(d.esperado.entrada, d.esperado.salida, 0);
+    return { hrsNormales: 0, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: calcTeorico.horasVerdes };
   }
   if (d.tipo === 'libre' || d.tipo === 'feriado') {
     return { hrsNormales: 0, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: 0 };
   }
 
-  const permanenciaTotal = horasEntreTiempos(d.entradaReal, d.salidaReal);
-  const colacionConfigurada = d.esperado ? (d.esperado.colacion || 0) : 0;
-  const colacion = permanenciaTotal <= 5 ? 0 : colacionConfigurada;
-  const horasReales = Math.max(0, permanenciaTotal - colacion / 60);
+  // Jornada teórica esperada para este día (neta, según el horario
+  // configurado para el trabajador en ese día de la semana).
+  const horasTeoricasMeta = d.esperado ? Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60) : 0;
+  const calc = calcularDiaTrabajo(d.entradaReal, d.salidaReal, horasTeoricasMeta);
+  const horasReales = calc.horasVerdes;
 
   if (!d.esperado) {
     // Día fuera del horario semanal contratado (no aplica para ningún tipo):
@@ -121,17 +148,14 @@ function computarDia(d) {
   if (d.tipo === 'normferiado') {
     // Día normalmente laboral que cae en feriado: lo trabajado es 100% extra,
     // y si no se cubre el horario esperado, esa diferencia igual se descuenta.
-    const horasEsperadas = Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60);
-    const hrsDesc = Math.max(0, horasEsperadas - horasReales);
-    return { hrsNormales: 0, hrsExtra: horasReales, hrsExtraDirecta: 0, hrsDesc };
+    return { hrsNormales: 0, hrsExtra: horasReales, hrsExtraDirecta: 0, hrsDesc: calc.horasRojas };
   }
 
   // tipo === 'normal', día contemplado en el horario semanal
-  const horasEsperadas = Math.max(0, horasEntreTiempos(d.esperado.entrada, d.esperado.salida) - (d.esperado.colacion || 0) / 60);
-  if (horasReales >= horasEsperadas) {
-    return { hrsNormales: horasEsperadas, hrsExtra: horasReales - horasEsperadas, hrsExtraDirecta: 0, hrsDesc: 0 };
+  if (horasReales >= horasTeoricasMeta) {
+    return { hrsNormales: horasTeoricasMeta, hrsExtra: horasReales - horasTeoricasMeta, hrsExtraDirecta: 0, hrsDesc: 0 };
   }
-  return { hrsNormales: horasReales, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: horasEsperadas - horasReales };
+  return { hrsNormales: horasReales, hrsExtra: 0, hrsExtraDirecta: 0, hrsDesc: calc.horasRojas };
 }
 
 // ---------- RESUMEN SEMANAL (lunes a domingo) ----------

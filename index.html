@@ -35,12 +35,27 @@
     <button class="tab-btn active" data-tab="tab-trabajadores" onclick="switchTab('tab-trabajadores')">Trabajadores</button>
     <button class="tab-btn" data-tab="tab-asistencia" onclick="switchTab('tab-asistencia')">Asistencia</button>
     <button class="tab-btn" data-tab="tab-liquidacion" onclick="switchTab('tab-liquidacion')">Liquidación</button>
+    <button class="tab-btn" data-tab="tab-empresa" onclick="switchTab('tab-empresa')">Empresa</button>
   </div>
 
   <div class="main">
 
-    <!-- ============== TAB: TRABAJADORES ============== -->
-    <div class="panel active" id="tab-trabajadores">
+    <!-- ============== TAB: EMPRESA ============== -->
+    <div class="panel" id="tab-empresa">
+      <div class="card">
+        <div class="section-title">Logo de la empresa</div>
+        <p class="hint" style="margin-bottom:12px;">Este logo aparece en el encabezado de las liquidaciones de sueldo.</p>
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div class="logo-preview" id="emp-logo-preview">Sin logo</div>
+          <div style="flex:1;">
+            <input type="file" id="emp-logo-file" accept="image/*" onchange="onLogoFileSelected()" />
+            <div class="btn-row" style="margin-top:8px;">
+              <button class="btn-secondary btn-small" style="margin:0;" onclick="subirLogoEmpresa()">Subir logo</button>
+              <button class="btn-secondary btn-small btn-danger" style="margin:0;" onclick="quitarLogoEmpresa()">Quitar logo</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div class="card">
         <div class="section-title">Datos de la empresa</div>
@@ -51,6 +66,10 @@
         <div class="field"><label>Dirección</label><input type="text" id="emp-direccion" /></div>
         <button class="btn-secondary" onclick="guardarEmpresa()">Guardar datos de empresa</button>
       </div>
+    </div>
+
+    <!-- ============== TAB: TRABAJADORES ============== -->
+    <div class="panel active" id="tab-trabajadores">
 
       <!-- LISTA DE TRABAJADORES -->
       <div class="card" id="trab-list-card">
@@ -83,7 +102,28 @@
           </div>
           <div class="grid-2">
             <div class="field"><label>Inicio contrato</label><input type="date" id="t-fecha-inicio" /></div>
-            <div class="field"><label>Fin contrato</label><input type="date" id="t-fecha-fin" /></div>
+            <div class="field">
+              <label>Fin contrato</label>
+              <input type="date" id="t-fecha-fin" />
+              <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:#666; font-weight:400; margin-top:6px;">
+                <input type="checkbox" id="t-indefinido" onchange="onIndefinidoChange()" style="width:auto;" /> Contrato indefinido (sin fecha de término)
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Contacto y datos bancarios</div>
+          <p class="hint" style="margin-bottom:10px;">Estos datos no se usan en la liquidación, son de referencia.</p>
+          <div class="field"><label>Domicilio</label><input type="text" id="t-domicilio" /></div>
+          <div class="grid-3">
+            <div class="field"><label>Teléfono</label><input type="text" id="t-telefono" /></div>
+            <div class="field"><label>Correo</label><input type="email" id="t-correo" /></div>
+            <div class="field"><label>Banco</label><input type="text" id="t-banco" /></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Tipo de cuenta</label><input type="text" id="t-tipo-cuenta" placeholder="Cuenta corriente, vista, RUT..." /></div>
+            <div class="field"><label>Número de cuenta</label><input type="text" id="t-numero-cuenta" /></div>
           </div>
         </div>
 
@@ -99,6 +139,13 @@
             <div class="field"><label>Institución de salud</label><input type="text" id="t-inst-salud" /></div>
             <div class="field"><label>Plan salud (%)</label><input type="number" step="0.01" id="t-plan-salud" /></div>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="section-title">Contrato de trabajo</div>
+          <div id="t-contrato-actual" class="hint" style="margin-bottom:10px;">Sin contrato cargado.</div>
+          <input type="file" id="t-contrato-file" accept="application/pdf" />
+          <p class="hint">Solo PDF. Al guardar el trabajador se sube automáticamente.</p>
         </div>
 
         <div class="card">
@@ -136,7 +183,7 @@
     <!-- ============== TAB: ASISTENCIA ============== -->
     <div class="panel" id="tab-asistencia">
 
-      <div class="card">
+      <div class="card no-print-asis">
         <div class="section-title">Período a registrar</div>
         <div class="grid-4">
           <div class="field"><label>Trabajador</label><select id="a-trabajador" onchange="onTrabajadorChangeAsis()"></select></div>
@@ -156,18 +203,18 @@
         <div class="hint" id="a-status"></div>
       </div>
 
-      <div class="card" id="a-hist-card" style="display:none;">
+      <div class="card no-print-asis" id="a-hist-card" style="display:none;">
         <div class="section-title">Meses guardados de este trabajador</div>
         <div class="hist-list" id="a-hist-list"></div>
       </div>
 
       <div id="a-planilla-wrap" style="display:none;">
 
-        <div class="info-box">
+        <div class="info-box no-print-asis">
           💡 Ingresa la hora real de entrada y salida de cada día. Las horas extras y no realizadas se calculan comparando con el horario esperado (restando la colación correspondiente). Cambia el tipo si el trabajador estuvo <strong>ausente</strong>, tuvo <strong>día libre</strong> o <strong>feriado</strong>. Los días fuera de su contrato cambiados a "Normal" computarán 100% como horas extra.
         </div>
 
-        <div class="card">
+        <div class="card no-print-asis">
           <div class="section-title">Resumen del mes</div>
           <div class="resumen-grid">
             <div class="metric"><div class="metric-lbl">Días trabajados</div><div class="metric-val" id="ar-dias">0</div><div class="metric-sub">del mes</div></div>
@@ -240,7 +287,7 @@
         <div class="card">
           <div class="section-title">Trabajador y período</div>
           <div class="grid-4">
-            <div class="field"><label>Trabajador</label><select id="l-trabajador"></select></div>
+            <div class="field"><label>Trabajador</label><select id="l-trabajador" onchange="onTrabajadorChangeLiq()"></select></div>
             <div class="field"><label>Mes</label>
               <select id="l-mes">
                 <option>Enero</option><option>Febrero</option><option>Marzo</option>
@@ -262,38 +309,15 @@
 
         <div id="l-form-wrap" style="display:none;">
 
-          <div class="card">
-            <div class="section-title">Empresa</div>
-            <div class="grid-2">
-              <div class="field"><label>RUT empresa</label><input type="text" id="rut-emp" disabled /></div>
-              <div class="field"><label>Nombre empresa</label><input type="text" id="nom-emp" disabled /></div>
-            </div>
-            <div class="field"><label>Dirección</label><input type="text" id="dir-emp" disabled /></div>
-          </div>
-
-          <div class="card">
-            <div class="section-title">Trabajador</div>
-            <div class="grid-2">
-              <div class="field"><label>Nombre completo</label><input type="text" id="nom-trab" disabled /></div>
-              <div class="field"><label>RUT trabajador</label><input type="text" id="rut-trab" disabled /></div>
-            </div>
-            <div class="grid-3">
-              <div class="field"><label>Cargo</label><input type="text" id="cargo" disabled /></div>
-              <div class="field"><label>Centro de negocio</label><input type="text" id="cneg" disabled /></div>
-              <div class="field"><label>Tipo de contrato</label><input type="text" id="tipo-cont" disabled /></div>
-            </div>
-            <div class="grid-2">
-              <div class="field"><label>Inicio contrato</label><input type="date" id="ini-cont" disabled /></div>
-              <div class="field"><label>Fin contrato</label><input type="date" id="fin-cont" disabled /></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="section-title">Sueldo y período</div>
-            <div class="grid-3">
-              <div class="field"><label>Sueldo base contrato ($)</label><input type="number" id="sbase" disabled /></div>
-              <div class="field"><label>Mes de liquidación</label><input type="text" id="mes-liq-display" disabled /></div>
-              <div class="field"><label>Año</label><input type="text" id="anio-liq-display" disabled /></div>
+          <div class="card" id="l-resumen-trab">
+            <div class="section-title">Liquidando a</div>
+            <div style="display:flex; flex-wrap:wrap; gap: 8px 22px; font-size:13px;">
+              <div><strong id="lr-nombre"></strong> <span style="color:#888;" id="lr-cargo"></span></div>
+              <div style="color:#888;">RUT: <span id="lr-rut"></span></div>
+              <div style="color:#888;">Sueldo base: <span id="lr-sbase"></span></div>
+              <div style="color:#888;">AFP: <span id="lr-afp"></span></div>
+              <div style="color:#888;">Salud: <span id="lr-salud"></span></div>
+              <div style="color:#888;">Período: <span id="lr-periodo"></span></div>
             </div>
           </div>
 
@@ -310,19 +334,6 @@
               <div class="field"><label>Horas descontadas</label><input type="number" id="hrs-desc" value="0" step="0.01" min="0" /></div>
               <div class="field"><label>Horas extra</label><input type="number" id="hrs-ext" value="0" step="0.01" min="0" /></div>
               <div class="field"><label>Valor hora ($)</label><input type="number" id="val-hora" value="0" /></div>
-            </div>
-          </div>
-
-          <div class="card">
-            <div class="section-title">Previsión y salud</div>
-            <div class="grid-3">
-              <div class="field"><label>AFP</label><input type="text" id="afp" disabled /></div>
-              <div class="field"><label>Tasa AFP (%)</label><input type="number" id="tasa-afp" step="0.01" disabled /></div>
-              <div class="field"><label>% Adicional AFP</label><input type="number" id="afp-adic" step="0.01" disabled /></div>
-            </div>
-            <div class="grid-2">
-              <div class="field"><label>Institución de salud</label><input type="text" id="inst-salud" disabled /></div>
-              <div class="field"><label>Plan salud (%)</label><input type="number" id="plan-salud" step="0.01" disabled /></div>
             </div>
           </div>
 
@@ -376,6 +387,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
+<script src="empresa.js"></script>
 <script src="trabajadores.js"></script>
 <script src="asistencia.js"></script>
 <script src="liquidacion.js"></script>

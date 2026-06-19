@@ -1,0 +1,69 @@
+// ============================================================
+// empresa.js - logo de la empresa (Supabase Storage)
+// ============================================================
+
+var logoFileSeleccionado = null;
+
+function onLogoFileSelected() {
+  const input = document.getElementById('emp-logo-file');
+  logoFileSeleccionado = input.files[0] || null;
+  if (logoFileSeleccionado) {
+    const url = URL.createObjectURL(logoFileSeleccionado);
+    document.getElementById('emp-logo-preview').innerHTML = `<img src="${url}" alt="Logo" />`;
+  }
+}
+
+function renderLogoPreview() {
+  const box = document.getElementById('emp-logo-preview');
+  if (!box) return;
+  if (empresaCache && empresaCache.logo_url) {
+    box.innerHTML = `<img src="${empresaCache.logo_url}" alt="Logo" />`;
+  } else {
+    box.innerHTML = 'Sin logo';
+  }
+}
+
+async function subirLogoEmpresa() {
+  if (!logoFileSeleccionado) { showToast('Primero elige una imagen', 'error'); return; }
+  const ext = (logoFileSeleccionado.name.split('.').pop() || 'png').toLowerCase();
+  const path = `logo-${Date.now()}.${ext}`;
+
+  const { error: upErr } = await sb.storage.from('logos').upload(path, logoFileSeleccionado, { upsert: true });
+  if (upErr) { showToast('Error al subir el logo: ' + upErr.message, 'error'); return; }
+
+  const { data: urlData } = sb.storage.from('logos').getPublicUrl(path);
+
+  const oldPath = empresaCache ? empresaCache.logo_path : null;
+  const { error: dbErr } = await sb.from('empresa').update({
+    logo_path: path, logo_url: urlData.publicUrl, updated_at: new Date().toISOString(),
+  }).eq('id', 1);
+  if (dbErr) { showToast('El logo se subió pero no se pudo guardar la referencia: ' + dbErr.message, 'error'); return; }
+
+  if (oldPath && oldPath !== path) {
+    await sb.storage.from('logos').remove([oldPath]);
+  }
+
+  empresaCache.logo_path = path;
+  empresaCache.logo_url = urlData.publicUrl;
+  logoFileSeleccionado = null;
+  document.getElementById('emp-logo-file').value = '';
+  renderLogoPreview();
+  showToast('Logo actualizado ✓');
+}
+
+async function quitarLogoEmpresa() {
+  if (!empresaCache || !empresaCache.logo_path) { showToast('No hay logo cargado', 'error'); return; }
+  const ok = confirm('¿Quitar el logo de la empresa?');
+  if (!ok) return;
+
+  await sb.storage.from('logos').remove([empresaCache.logo_path]);
+  const { error } = await sb.from('empresa').update({
+    logo_path: null, logo_url: null, updated_at: new Date().toISOString(),
+  }).eq('id', 1);
+  if (error) { showToast('Error al quitar el logo: ' + error.message, 'error'); return; }
+
+  empresaCache.logo_path = null;
+  empresaCache.logo_url = null;
+  renderLogoPreview();
+  showToast('Logo eliminado');
+}

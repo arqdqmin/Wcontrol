@@ -119,6 +119,7 @@ async function cargarEmpresa() {
   document.getElementById('emp-rut').value = data.rut || '';
   document.getElementById('emp-nombre').value = data.nombre || '';
   document.getElementById('emp-direccion').value = data.direccion || '';
+  if (typeof renderLogoPreview === 'function') renderLogoPreview();
 }
 
 async function guardarEmpresa() {

@@ -25,6 +25,7 @@ function renderTrabajadoresList() {
           <div class="trab-meta">${t.cargo || 'Sin cargo'} · ${t.rut || 'Sin RUT'} · ${fmtPesos(t.sueldo_base)}</div>
         </div>
         <div class="trab-actions">
+          ${t.contrato_path ? `<button class="btn-secondary btn-small" onclick="verContrato('${t.contrato_path}')">📄 Contrato</button>` : ''}
           <button class="btn-secondary btn-small" onclick="abrirFormTrabajador('${t.id}')">Editar</button>
           <button class="btn-secondary btn-small" onclick="archivarTrabajador('${t.id}', ${!t.activo})">${t.activo ? 'Archivar' : 'Reactivar'}</button>
           <button class="btn-secondary btn-small btn-danger" onclick="eliminarTrabajador('${t.id}')">Eliminar</button>
@@ -50,6 +51,13 @@ function abrirFormTrabajador(id) {
     document.getElementById('t-tipo-contrato').value = t.tipo_contrato || 'PLAZO FIJO';
     document.getElementById('t-fecha-inicio').value = t.fecha_inicio || '';
     document.getElementById('t-fecha-fin').value = t.fecha_fin || '';
+    document.getElementById('t-indefinido').checked = !!t.indefinido;
+    document.getElementById('t-domicilio').value = t.domicilio || '';
+    document.getElementById('t-telefono').value = t.telefono || '';
+    document.getElementById('t-correo').value = t.correo || '';
+    document.getElementById('t-banco').value = t.banco || '';
+    document.getElementById('t-tipo-cuenta').value = t.tipo_cuenta || '';
+    document.getElementById('t-numero-cuenta').value = t.numero_cuenta || '';
     document.getElementById('t-sueldo-base').value = t.sueldo_base || 0;
     document.getElementById('t-afp').value = t.afp || '';
     document.getElementById('t-tasa-afp').value = t.tasa_afp ?? 10.46;
@@ -59,10 +67,13 @@ function abrirFormTrabajador(id) {
     document.getElementById('t-dias-laborales').value = t.dias_laborales || 'lunes-viernes';
     document.getElementById('t-hrs-semana').value = t.hrs_semana || 44;
     horarioSemanaActual = t.horario_semana && typeof t.horario_semana === 'object' ? { ...t.horario_semana } : {};
+    renderContratoActual(t);
   } else {
     editingTrabajadorId = null;
     document.getElementById('trab-form-title').textContent = 'Nuevo trabajador';
-    ['t-nombre','t-rut','t-cargo','t-centro-negocio','t-fecha-inicio','t-fecha-fin'].forEach(id2 => document.getElementById(id2).value = '');
+    ['t-nombre','t-rut','t-cargo','t-centro-negocio','t-fecha-inicio','t-fecha-fin',
+     't-domicilio','t-telefono','t-correo','t-banco','t-tipo-cuenta','t-numero-cuenta'].forEach(id2 => document.getElementById(id2).value = '');
+    document.getElementById('t-indefinido').checked = false;
     document.getElementById('t-tipo-contrato').value = 'PLAZO FIJO';
     document.getElementById('t-sueldo-base').value = 0;
     document.getElementById('t-afp').value = '';
@@ -73,7 +84,10 @@ function abrirFormTrabajador(id) {
     document.getElementById('t-dias-laborales').value = 'lunes-viernes';
     document.getElementById('t-hrs-semana').value = 44;
     horarioSemanaActual = {};
+    renderContratoActual(null);
   }
+  document.getElementById('t-contrato-file').value = '';
+  onIndefinidoChange();
   renderHorarioSemanaForm();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -82,6 +96,18 @@ function cerrarFormTrabajador() {
   document.getElementById('trab-form-wrap').style.display = 'none';
   document.getElementById('trab-list-card').style.display = 'block';
   editingTrabajadorId = null;
+}
+
+// ---------- CONTRATO INDEFINIDO ----------
+function onIndefinidoChange() {
+  const checked = document.getElementById('t-indefinido').checked;
+  const fechaFin = document.getElementById('t-fecha-fin');
+  if (checked) {
+    fechaFin.value = '';
+    fechaFin.disabled = true;
+  } else {
+    fechaFin.disabled = false;
+  }
 }
 
 // ---------- HORARIO POR DÍA ----------
@@ -139,10 +165,50 @@ function recalcularHorasHorario() {
   document.getElementById('t-total-hrs').textContent = fmt2(total) + ' hrs';
 }
 
+// ---------- CONTRATO PDF ----------
+function renderContratoActual(t) {
+  const box = document.getElementById('t-contrato-actual');
+  if (t && t.contrato_path) {
+    box.innerHTML = `<div class="contrato-actual">
+      <span class="nombre-archivo">📄 ${t.contrato_nombre || 'contrato.pdf'}</span>
+      <button type="button" class="contrato-link" onclick="verContrato('${t.contrato_path}')">Ver</button>
+      <button type="button" class="contrato-link" onclick="quitarContratoTrabajador('${t.id}')">Quitar</button>
+    </div>`;
+  } else {
+    box.innerHTML = 'Sin contrato cargado.';
+  }
+}
+
+async function verContrato(path) {
+  const { data, error } = await sb.storage.from('contratos').createSignedUrl(path, 300);
+  if (error) { showToast('No se pudo abrir el contrato: ' + error.message, 'error'); return; }
+  window.open(data.signedUrl, '_blank');
+}
+
+async function quitarContratoTrabajador(id) {
+  const t = getTrabajadorById(id);
+  if (!t || !t.contrato_path) return;
+  const ok = confirm('¿Quitar el contrato cargado para este trabajador?');
+  if (!ok) return;
+
+  await sb.storage.from('contratos').remove([t.contrato_path]);
+  const { error } = await sb.from('trabajadores')
+    .update({ contrato_path: null, contrato_nombre: null, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) { showToast('Error al quitar contrato: ' + error.message, 'error'); return; }
+
+  await cargarTrabajadoresCache();
+  renderContratoActual(getTrabajadorById(id));
+  renderTrabajadoresList();
+  showToast('Contrato eliminado');
+}
+
 // ---------- GUARDAR / ARCHIVAR / ELIMINAR ----------
 async function guardarTrabajador() {
   const nombre = document.getElementById('t-nombre').value.trim();
   if (!nombre) { showToast('El nombre es obligatorio', 'error'); return; }
+
+  const indefinido = document.getElementById('t-indefinido').checked;
 
   const payload = {
     nombre,
@@ -151,7 +217,14 @@ async function guardarTrabajador() {
     centro_negocio: document.getElementById('t-centro-negocio').value.trim(),
     tipo_contrato: document.getElementById('t-tipo-contrato').value,
     fecha_inicio: document.getElementById('t-fecha-inicio').value || null,
-    fecha_fin: document.getElementById('t-fecha-fin').value || null,
+    fecha_fin: indefinido ? null : (document.getElementById('t-fecha-fin').value || null),
+    indefinido,
+    domicilio: document.getElementById('t-domicilio').value.trim(),
+    telefono: document.getElementById('t-telefono').value.trim(),
+    correo: document.getElementById('t-correo').value.trim(),
+    banco: document.getElementById('t-banco').value.trim(),
+    tipo_cuenta: document.getElementById('t-tipo-cuenta').value.trim(),
+    numero_cuenta: document.getElementById('t-numero-cuenta').value.trim(),
     sueldo_base: Number(document.getElementById('t-sueldo-base').value) || 0,
     afp: document.getElementById('t-afp').value.trim(),
     tasa_afp: Number(document.getElementById('t-tasa-afp').value) || 0,
@@ -164,15 +237,37 @@ async function guardarTrabajador() {
     updated_at: new Date().toISOString(),
   };
 
+  let trabId = editingTrabajadorId;
   let error;
-  if (editingTrabajadorId) {
-    ({ error } = await sb.from('trabajadores').update(payload).eq('id', editingTrabajadorId));
+  if (trabId) {
+    ({ error } = await sb.from('trabajadores').update(payload).eq('id', trabId));
   } else {
     payload.activo = true;
-    ({ error } = await sb.from('trabajadores').insert(payload));
+    const { data, error: insErr } = await sb.from('trabajadores').insert(payload).select().single();
+    error = insErr;
+    if (!error) trabId = data.id;
   }
 
   if (error) { showToast('Error al guardar: ' + error.message, 'error'); return; }
+
+  // subir contrato si se eligió un archivo nuevo
+  const fileInput = document.getElementById('t-contrato-file');
+  const contratoFile = fileInput.files[0];
+  if (contratoFile) {
+    const ext = (contratoFile.name.split('.').pop() || 'pdf').toLowerCase();
+    const path = `${trabId}/contrato_${Date.now()}.${ext}`;
+    const { error: upErr } = await sb.storage.from('contratos').upload(path, contratoFile, { upsert: true });
+    if (upErr) {
+      showToast('Trabajador guardado, pero el contrato no se pudo subir: ' + upErr.message, 'error');
+    } else {
+      const tPrevio = getTrabajadorById(trabId);
+      if (tPrevio && tPrevio.contrato_path && tPrevio.contrato_path !== path) {
+        await sb.storage.from('contratos').remove([tPrevio.contrato_path]);
+      }
+      await sb.from('trabajadores').update({ contrato_path: path, contrato_nombre: contratoFile.name }).eq('id', trabId);
+    }
+    fileInput.value = '';
+  }
 
   await cargarTrabajadoresCache();
   renderTrabajadoresList();
@@ -192,8 +287,11 @@ async function archivarTrabajador(id, nuevoEstado) {
 
 async function eliminarTrabajador(id) {
   const t = getTrabajadorById(id);
-  const ok = confirm(`¿Eliminar a "${t ? t.nombre : ''}"?\n\nEsto también borrará TODA su asistencia y liquidaciones guardadas. Esta acción no se puede deshacer.\n\nSi solo quieres ocultarlo de las listas, usa "Archivar" en vez de esto.`);
+  const ok = confirm(`¿Eliminar a "${t ? t.nombre : ''}"?\n\nEsto también borrará TODA su asistencia y liquidaciones guardadas (y su contrato, si tiene uno cargado). Esta acción no se puede deshacer.\n\nSi solo quieres ocultarlo de las listas, usa "Archivar" en vez de esto.`);
   if (!ok) return;
+  if (t && t.contrato_path) {
+    await sb.storage.from('contratos').remove([t.contrato_path]);
+  }
   const { error } = await sb.from('trabajadores').delete().eq('id', id);
   if (error) { showToast('Error al eliminar: ' + error.message, 'error'); return; }
   await cargarTrabajadoresCache();

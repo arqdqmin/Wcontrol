@@ -8,6 +8,18 @@ var anioActualLiq = 2026;
 var registroIdLiq = null;
 var lastCalc = null;
 
+// ---------- AL CAMBIAR EL TRABAJADOR: mostrar historial de inmediato ----------
+function onTrabajadorChangeLiq() {
+  const trabajadorId = document.getElementById('l-trabajador').value;
+  document.getElementById('l-form-wrap').style.display = 'none';
+  document.getElementById('l-status').textContent = '';
+  if (trabajadorId) {
+    cargarHistLiq(trabajadorId);
+  } else {
+    document.getElementById('l-hist-card').style.display = 'none';
+  }
+}
+
 // ---------- CARGAR DATOS DEL TRABAJADOR / PERÍODO ----------
 async function cargarTrabajadorLiq() {
   const trabajadorId = document.getElementById('l-trabajador').value;
@@ -19,25 +31,13 @@ async function cargarTrabajadorLiq() {
   mesActualLiq = document.getElementById('l-mes').selectedIndex;
   anioActualLiq = Number(document.getElementById('l-anio').value);
 
-  document.getElementById('rut-emp').value = empresaCache ? (empresaCache.rut || '') : '';
-  document.getElementById('nom-emp').value = empresaCache ? (empresaCache.nombre || '') : '';
-  document.getElementById('dir-emp').value = empresaCache ? (empresaCache.direccion || '') : '';
-
-  document.getElementById('nom-trab').value = t.nombre || '';
-  document.getElementById('rut-trab').value = t.rut || '';
-  document.getElementById('cargo').value = t.cargo || '';
-  document.getElementById('cneg').value = t.centro_negocio || '';
-  document.getElementById('tipo-cont').value = t.tipo_contrato || '';
-  document.getElementById('ini-cont').value = t.fecha_inicio || '';
-  document.getElementById('fin-cont').value = t.fecha_fin || '';
-  document.getElementById('sbase').value = t.sueldo_base || 0;
-  document.getElementById('mes-liq-display').value = MESES_NOMBRES[mesActualLiq];
-  document.getElementById('anio-liq-display').value = anioActualLiq;
-  document.getElementById('afp').value = t.afp || '';
-  document.getElementById('tasa-afp').value = t.tasa_afp ?? 0;
-  document.getElementById('afp-adic').value = t.afp_adicional ?? 0;
-  document.getElementById('inst-salud').value = t.institucion_salud || '';
-  document.getElementById('plan-salud').value = t.plan_salud ?? 0;
+  document.getElementById('lr-nombre').textContent = t.nombre || '';
+  document.getElementById('lr-cargo').textContent = t.cargo ? `(${t.cargo})` : '';
+  document.getElementById('lr-rut').textContent = t.rut || '—';
+  document.getElementById('lr-sbase').textContent = fmtPesos(t.sueldo_base);
+  document.getElementById('lr-afp').textContent = t.afp || '—';
+  document.getElementById('lr-salud').textContent = t.institucion_salud || '—';
+  document.getElementById('lr-periodo').textContent = `${MESES_NOMBRES[mesActualLiq]} ${anioActualLiq}`;
 
   const { data: liqExist } = await sb.from('liquidaciones').select('*')
     .eq('trabajador_id', trabajadorId).eq('anio', anioActualLiq).eq('mes', mesActualLiq).maybeSingle();
@@ -86,14 +86,17 @@ async function cargarTrabajadorLiq() {
 
 // ---------- CÁLCULO ----------
 function calcularLiq() {
-  const sbase = Number(document.getElementById('sbase').value) || 0;
+  const t = trabajadorActualLiq;
+  if (!t) { showToast('Carga un trabajador primero', 'error'); return; }
+
+  const sbase = t.sueldo_base || 0;
   const dTrab = Number(document.getElementById('d-trab').value) || 0;
   const hrsDesc = Number(document.getElementById('hrs-desc').value) || 0;
   const hrsExt = Number(document.getElementById('hrs-ext').value) || 0;
   const valHora = Number(document.getElementById('val-hora').value) || 0;
-  const tasaAfp = Number(document.getElementById('tasa-afp').value) || 0;
-  const afpAdic = Number(document.getElementById('afp-adic').value) || 0;
-  const planSalud = Number(document.getElementById('plan-salud').value) || 0;
+  const tasaAfp = t.tasa_afp || 0;
+  const afpAdic = t.afp_adicional || 0;
+  const planSalud = t.plan_salud || 0;
 
   const montoHrsDesc = Math.round(hrsDesc * valHora);
   const montoHrsExt = Math.round(hrsExt * valHora * 1.5);
@@ -120,9 +123,9 @@ function calcularLiq() {
   document.getElementById('r-ext').textContent = fmtPesos(montoHrsExt);
   document.getElementById('r-grat').textContent = fmtPesos(gratifMensual);
   document.getElementById('r-imp').textContent = fmtPesos(totalImponible);
-  document.getElementById('r-afp-lbl').textContent = (document.getElementById('afp').value || 'AFP') + ` (${fmt2(tasaAfp + afpAdic)}%)`;
+  document.getElementById('r-afp-lbl').textContent = (t.afp || 'AFP') + ` (${fmt2(tasaAfp + afpAdic)}%)`;
   document.getElementById('r-afp').textContent = '-' + fmtPesos(totalAfp);
-  document.getElementById('r-sal-lbl').textContent = (document.getElementById('inst-salud').value || 'Salud') + ` (${fmt2(planSalud)}%)`;
+  document.getElementById('r-sal-lbl').textContent = (t.institucion_salud || 'Salud') + ` (${fmt2(planSalud)}%)`;
   document.getElementById('r-sal').textContent = '-' + fmtPesos(aporteSalud);
   document.getElementById('r-desc').textContent = '-' + fmtPesos(leyesSociales);
   document.getElementById('r-liq').textContent = fmtPesos(sueldoLiquido);
@@ -138,9 +141,13 @@ function mostrarImpresionLiq() {
   const c = lastCalc;
   const mesNombre = MESES_NOMBRES[mesActualLiq];
 
+  const logoHtml = (empresaCache && empresaCache.logo_url)
+    ? `<img src="${empresaCache.logo_url}" alt="Logo" style="width:100%;height:100%;object-fit:contain;" />`
+    : 'LOGO';
+
   const html = `
     <div class="liq-header">
-      <div class="liq-logo">LOGO</div>
+      <div class="liq-logo">${logoHtml}</div>
       <div>
         <div class="liq-empresa-nombre">${(empresaCache && empresaCache.nombre) || ''}</div>
         <div class="liq-empresa-dir">RUT ${(empresaCache && empresaCache.rut) || ''} — ${(empresaCache && empresaCache.direccion) || ''}</div>
@@ -152,7 +159,7 @@ function mostrarImpresionLiq() {
       <div class="liq-lbl">RUT</div><div class="liq-val">${t.rut || ''}</div>
       <div class="liq-lbl">Cargo</div><div class="liq-val">${t.cargo || ''}</div>
       <div class="liq-lbl">Centro de negocio</div><div class="liq-val">${t.centro_negocio || ''}</div>
-      <div class="liq-lbl">Tipo de contrato</div><div class="liq-val">${t.tipo_contrato || ''}</div>
+      <div class="liq-lbl">Tipo de contrato</div><div class="liq-val">${t.indefinido ? 'Indefinido' : (t.tipo_contrato || '')}</div>
       <div class="liq-lbl">Inicio contrato</div><div class="liq-val">${fmtDate(t.fecha_inicio)}</div>
       <div class="liq-lbl">AFP</div><div class="liq-val">${t.afp || ''}</div>
       <div class="liq-lbl">Salud</div><div class="liq-val">${t.institucion_salud || ''}</div>

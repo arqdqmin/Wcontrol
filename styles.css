@@ -121,6 +121,11 @@ input[type="checkbox"] { width: auto !important; accent-color: #1a1a1a; cursor: 
 .dias-table tr.fila-ausente td { background: #fef9f9; }
 .dias-table tr.fila-libre td { background: #fafaf8; }
 .dias-table tr.semana-divisor td { background: #f0f0ec; color: #666; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 7px 8px; border-bottom: 1px solid #e0e0da; border-top: 1px solid #e0e0da; }
+.tabla-recalculada-flash { animation: flashRecalculo 0.7s ease-out; }
+@keyframes flashRecalculo {
+  0% { background-color: #e8f3ec; }
+  100% { background-color: transparent; }
+}
 
 .tag-dia { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
 .tag-normal  { background: #eaf3de; color: #3b6d11; }

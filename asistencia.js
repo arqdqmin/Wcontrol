@@ -402,6 +402,40 @@ function cambiarHoraAsis(i, campo, val) {
   renderTablaAsis();
 }
 
+// ---------- RECALCULAR Y VALIDAR SEMANA ----------
+// Fuerza una resincronización completa del Resumen Semanal: descarta
+// cualquier total que estuviera en pantalla, vuelve a agrupar y sumar
+// (reduce) el registro diario ACTUAL tal como está en este momento, aplica
+// la licuadora (consolidarSemana) sobre esos totales nuevos, y refresca la
+// vista. En la práctica, renderTablaAsis() ya hace exactamente esto en cada
+// edición — este botón existe para que puedas forzarlo y confirmarlo
+// explícitamente cuando quieras estar 100% seguro de que lo que ves
+// coincide con el registro diario actual.
+function recalcularResumenSemanal() {
+  if (!trabajadorActualAsis || !diasDataAsis.length) {
+    showToast('Primero carga la asistencia de un trabajador y mes', 'error');
+    return;
+  }
+
+  // 1) Descartar cualquier total acumulado anterior de la tabla.
+  const tablaSemanas = document.getElementById('a-tabla-semanas');
+  if (tablaSemanas) tablaSemanas.innerHTML = '';
+
+  // 2) y 3) Reconstruir la agregación semanal desde cero (reduce) y aplicar
+  // la licuadora — esto es exactamente lo que hace consolidarResumenMensual().
+  // 4) Refrescar toda la vista (tabla diaria, métricas, resumen semanal).
+  renderTablaAsis();
+
+  // Pequeño destello visual para que se note que la tabla se refrescó.
+  const tablaActualizada = document.getElementById('a-tabla-semanas');
+  if (tablaActualizada) {
+    tablaActualizada.classList.add('tabla-recalculada-flash');
+    setTimeout(() => tablaActualizada.classList.remove('tabla-recalculada-flash'), 700);
+  }
+
+  showToast('Totales sincronizados con el registro diario ✓');
+}
+
 // ---------- GUARDAR ----------
 async function guardarAsistencia() {
   if (!trabajadorActualAsis) { showToast('Carga un trabajador primero', 'error'); return; }

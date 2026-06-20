@@ -46,7 +46,8 @@ function showToast(msg, type) {
   el.textContent = msg;
   el.className = 'toast visible' + (type === 'error' ? ' error' : '');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.classList.remove('visible'); }, 3000);
+  const duracion = type === 'error' ? 6000 : 3000;
+  toastTimer = setTimeout(() => { el.classList.remove('visible'); }, duracion);
 }
 
 // ---------- AUTENTICACIÓN ----------

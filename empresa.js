@@ -42,7 +42,14 @@ async function subirLogoEmpresa() {
   const path = `logo-${Date.now()}.${ext}`;
 
   const { error: upErr } = await sb.storage.from('logos').upload(path, logoFileSeleccionado, { upsert: true });
-  if (upErr) { showToast('Error al subir el logo: ' + upErr.message, 'error'); return; }
+  if (upErr) {
+    const esBucketFaltante = /bucket/i.test(upErr.message) && /not found/i.test(upErr.message);
+    const msg = esBucketFaltante
+      ? 'El bucket "logos" no existe todavía en Supabase. Ve a SQL Editor en tu proyecto y vuelve a correr schema.sql completo (es seguro, no borra nada) — eso crea el bucket automáticamente.'
+      : 'Error al subir el logo: ' + upErr.message;
+    showToast(msg, 'error');
+    return;
+  }
 
   const { data: urlData } = sb.storage.from('logos').getPublicUrl(path);
 

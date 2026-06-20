@@ -76,7 +76,7 @@ input:disabled { color: #999; background: #f0f0ec; }
 .login-error.visible { display: block; }
 
 /* ---------- TOAST ---------- */
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 18px; border-radius: 9px; font-size: 13px; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1a1a1a; color: #fff; padding: 10px 18px; border-radius: 9px; font-size: 13px; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s, transform 0.2s; max-width: min(440px, calc(100vw - 40px)); text-align: center; white-space: normal; line-height: 1.45; }
 .toast.visible { opacity: 1; transform: translateX(-50%) translateY(-4px); }
 .toast.error { background: #a32d2d; }
 

@@ -22,7 +22,34 @@ la información se guarda en **Supabase** y la app se aloja gratis en
 Cada trabajador tiene su propio historial de meses guardados, visible en
 ambas pestañas.
 
-## Novedades de esta versión — corrección de bugs críticos reportados (Mayo 2026)
+## Novedades de esta versión — corrección de la licuadora semanal (raíz del problema)
+
+Encontré la causa real de los descuentos mal calculados en semanas 1 y 4 de
+tu reporte de mayo: la "deuda semanal" se calculaba como `meta − horas
+normales`, y eso se rompe en cuanto la semana tiene un día tipo **Extra** o
+**Norm/Feriado**, porque esos tipos mandan el 100% de sus horas reales al
+balde de "extra" y nada al de "normales" — entonces la deuda quedaba
+inflada (le restaba esas horas dos veces). Además, en semanas parciales de
+inicio/fin de mes, un día Feriado contaba como "día contractual" para
+prorratear la meta, aunque un feriado no genera ninguna obligación de
+horas.
+
+**Solución**: la licuadora ahora neta directamente el total de horas de
+descuento de la semana contra el total de horas extra de la semana (ambos
+ya correctamente calculados día por día, contra el horario propio de cada
+día) — sin recalcular ninguna meta semanal. Esto resuelve ambos casos a la
+vez y de paso simplifica el código: ya no hace falta prorratear nada para
+semanas mochas, porque cada día presente ya aporta su número correcto (los
+feriados/libres aportan 0 por diseño).
+
+Verificado contra tu reporte exacto de Gabriela (mayo 2026): semana 1 pasa
+de un descuento mal calculado de ~10,80h a 3,00h (que es exactamente el
+descuento real del sábado 02/05, el único día contractual de esa semana
+dentro de mayo); semana 4 pasa de ~10,50h a 4,50h (16,00 − 2,00 según tu
+propio cálculo manual del enunciado anterior). Las semanas 2, 3 y 5, que ya
+estaban bien, no cambiaron.
+
+## Novedades de la versión anterior
 
 Reescribí por completo la consolidación mensual/semanal en una sola función
 (`consolidarResumenMensual`), que reemplaza todo lo anterior. Corrige los 3

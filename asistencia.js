@@ -164,29 +164,33 @@ function redondear(n) {
 }
 
 // ---------- LICUADORA: compensación de extra contra deuda semanal ----------
-// Recibe los totales YA SUMADOS de una semana (o de una semana parcial, con
-// su meta ya proporcionada) y compensa la deuda de horas con las horas
-// extra ganadas esos mismos días contractuales.
-function consolidarSemana(totalHorasVerdesTrabajadas, totalHorasExtrasDiarias, horasMetaSemanal) {
-  const V = totalHorasVerdesTrabajadas || 0;
+// IMPORTANTE: la deuda de la semana se toma directamente de la SUMA de los
+// descuentos diarios ya calculados (cada día ya midió correctamente su
+// propia falta contra SU PROPIA meta, vía calcularDiaTrabajo). NO se
+// recalcula una "meta semanal menos horas normales", porque eso falla en
+// cuanto hay días tipo "Extra" o "Norm/Feriado" en la semana: esos días
+// mandan TODAS sus horas reales al balde de extra y nada al de normales,
+// así que comparar la meta contra solo el balde de "normales" infla la
+// deuda artificialmente (descontando esas horas dos veces). Tampoco hace
+// falta prorratear nada para semanas mochas de inicio/fin de mes: cada día
+// presente ya aporta su descuento real (los feriados/libres aportan 0 por
+// diseño), así que sumarlos tal cual ya da el resultado correcto.
+function consolidarSemana(totalHorasDescuentoDiarias, totalHorasExtrasDiarias) {
+  const D = totalHorasDescuentoDiarias || 0;
   const E = totalHorasExtrasDiarias || 0;
-  const M = horasMetaSemanal || 0;
 
-  // 1. Deuda teórica de la semana (o de la porción de semana que corresponda)
-  const deudaTeorica = redondear(M - V);
-
-  if (deudaTeorica <= 0) {
-    // Cumplió (o superó) la jornada ordinaria: no hay deuda que cubrir.
+  if (D <= 0) {
+    // No hay deuda esa semana: toda la extra se paga como extra.
     return { horasExtraFinales: redondear(E), horasDescuentoFinal: 0 };
   }
 
-  // 2. Licuadora: la extra amortigua la deuda primero
-  if (E >= deudaTeorica) {
-    return { horasExtraFinales: redondear(E - deudaTeorica), horasDescuentoFinal: 0 };
+  if (E >= D) {
+    // La extra alcanza y sobra para cubrir la deuda.
+    return { horasExtraFinales: redondear(E - D), horasDescuentoFinal: 0 };
   }
 
-  // Se sacrifica toda la extra y aun así queda deuda
-  return { horasExtraFinales: 0, horasDescuentoFinal: redondear(deudaTeorica - E) };
+  // Se sacrifica toda la extra y aun así queda deuda.
+  return { horasExtraFinales: 0, horasDescuentoFinal: redondear(D - E) };
 }
 
 // ============================================================
@@ -198,19 +202,17 @@ function consolidarSemana(totalHorasVerdesTrabajadas, totalHorasExtrasDiarias, h
 //      una lógica distinta en otra parte — así la pantalla diaria y el
 //      resumen semanal jamás pueden desincronizarse entre sí.
 //   2. Agrupa esos cálculos por semana (lunes a domingo) con reduce().
-//   3. Si la semana queda "mocha" por el inicio/fin de mes (no están todos
-//      los días contractuales del trabajador dentro de este mes), la meta
-//      semanal (ej. 42h) se prorratea según cuántos días contractuales de
-//      esa semana sí caen dentro del mes.
-//   4. Aplica la licuadora (consolidarSemana) por semana, dejando las horas
-//      extra "fuera de horario" (domingos, días no contractuales) congeladas
-//      aparte — nunca entran a la licuadora.
+//   3. Aplica la licuadora (consolidarSemana) por semana, netando el total
+//      de descuento diario contra el total de extra diaria de esa semana.
+//      Esto funciona igual de bien para semanas completas y para semanas
+//      mochas de inicio/fin de mes, sin necesitar prorratear ninguna meta.
+//   4. Deja las horas extra "fuera de horario" (domingos, días no
+//      contractuales) congeladas aparte — nunca entran a la licuadora.
 function consolidarResumenMensual(diasData, trabajador) {
   // 1) Un único cálculo por día — esto es lo que usa también la tabla diaria.
   const diasCalculados = diasData.map(dia => ({ dia, calculo: computarDia(dia) }));
 
   const diasContratoSemana = trabajador ? getDiasLaboralesSet(trabajador.dias_laborales).length : 0;
-  const horasMetaSemanalCompleta = (trabajador && trabajador.hrs_semana) ? trabajador.hrs_semana : 0;
 
   // 2) Agrupar por semana con reduce — una sola pasada, un solo criterio.
   const semanasPorClave = diasCalculados.reduce((acc, { dia, calculo }) => {
@@ -229,7 +231,7 @@ function consolidarResumenMensual(diasData, trabajador) {
     return acc;
   }, {});
 
-  // 3) Meta proporcional para semanas mochas + licuadora, semana por semana.
+  // 3) Licuadora semana por semana, directamente sobre los totales diarios.
   const semanas = Object.values(semanasPorClave)
     .sort((a, b) => a.lunes - b.lunes)
     .map(s => {
@@ -238,16 +240,17 @@ function consolidarResumenMensual(diasData, trabajador) {
       const extraDirecta = redondear(s.extraDirecta);
       const desc = redondear(s.desc);
 
+      // Solo informativo (no afecta el cálculo): avisa si esta semana quedó
+      // a caballo entre dos meses, para que sepas que el resto de sus días
+      // está en el reporte del otro mes.
       const esParcial = diasContratoSemana > 0 && s.diasContractualesPresentes < diasContratoSemana;
-      const proporcion = diasContratoSemana > 0 ? Math.min(1, s.diasContractualesPresentes / diasContratoSemana) : 0;
-      const horasMetaSemanal = redondear(horasMetaSemanalCompleta * proporcion);
 
-      const { horasExtraFinales, horasDescuentoFinal } = consolidarSemana(normales, extra, horasMetaSemanal);
+      const { horasExtraFinales, horasDescuentoFinal } = consolidarSemana(desc, extra);
 
       return {
         lunes: fechaKeyLocal(s.lunes), domingo: fechaKeyLocal(s.domingo),
         normales, extra, extraDirecta, desc,
-        diasContractualesPresentes: s.diasContractualesPresentes, diasContratoSemana, esParcial, horasMetaSemanal,
+        diasContractualesPresentes: s.diasContractualesPresentes, diasContratoSemana, esParcial,
         horasExtraFinales, horasDescuentoFinal,
         // Lo que efectivamente pasa a Liquidación: la extra "fuera de horario"
         // (domingos) se suma siempre completa, congelada, sin pasar por la licuadora.
@@ -360,24 +363,24 @@ function renderResumenSemanal(semanas) {
   const tbody = document.getElementById('a-tabla-semanas');
   if (!tbody) return;
   if (!semanas.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#999;">Sin datos</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:#999;">Sin datos</td></tr>';
     return;
   }
   tbody.innerHTML = semanas.map(s => {
     const lunesD = new Date(s.lunes + 'T00:00:00');
     const domingoD = new Date(s.domingo + 'T00:00:00');
-    const metaTxt = s.esParcial
-      ? `<span title="Semana parcial: solo ${s.diasContractualesPresentes} de ${s.diasContratoSemana} días contractuales caen en este mes">${s.diasContractualesPresentes}/${s.diasContratoSemana} días · ${fmt2(s.horasMetaSemanal)}h ⚠️</span>`
-      : `${s.diasContractualesPresentes}/${s.diasContratoSemana} días · ${fmt2(s.horasMetaSemanal)}h`;
+    const diasTxt = s.esParcial
+      ? `<span title="Semana a caballo entre dos meses: el resto de sus días está en el reporte del otro mes">${s.diasContractualesPresentes}/${s.diasContratoSemana} días ⚠️</span>`
+      : `${s.diasContractualesPresentes}/${s.diasContratoSemana} días`;
     return `<tr>
       <td>${fmtDateCorta(lunesD)} – ${fmtDateCorta(domingoD)}</td>
-      <td class="horario-ref">${metaTxt}</td>
+      <td class="horario-ref">${diasTxt}</td>
       <td>${fmt2(s.normales)}</td>
       <td>${fmt2(s.extra)}</td>
       <td>${s.extraDirecta > 0 ? `<span class="hrs-badge hrs-extra">${fmt2(s.extraDirecta)}</span>` : '—'}</td>
       <td>${fmt2(s.desc)}</td>
-      <td>${s.horasExtraFinales > 0 ? `<span class="hrs-badge hrs-normal">+${fmt2(s.horasExtraFinales)}</span>` : '—'}</td>
-      <td>${s.horasDescuentoFinal > 0 ? `<span class="hrs-badge hrs-desc">-${fmt2(s.horasDescuentoFinal)}</span>` : '—'}</td>
+      <td>${s.horasExtraFinales > 0 ? `<span class="hrs-badge hrs-normal">${fmt2(s.horasExtraFinales)}</span>` : '—'}</td>
+      <td>${s.horasDescuentoFinal > 0 ? `<span class="hrs-badge hrs-desc">${fmt2(s.horasDescuentoFinal)}</span>` : '—'}</td>
     </tr>`;
   }).join('');
 }

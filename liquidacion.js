@@ -55,18 +55,27 @@ async function cargarTrabajadorLiq() {
     document.getElementById('l-status').textContent = `Editando una liquidación ya guardada (actualizada ${new Date(liqExist.updated_at).toLocaleString('es-CL')}).`;
   } else {
     registroIdLiq = null;
-    const { data: asis } = await sb.from('asistencia_mensual').select('resumen')
+    // Importante: se pide dias_data (el registro diario crudo), NO el
+    // "resumen" guardado. El resumen es una foto fija calculada con la
+    // lógica vigente al momento de guardar la Asistencia — si luego
+    // corregimos algo en el cálculo (como hicimos varias veces), los meses
+    // guardados antes de esa corrección quedarían con un resumen
+    // desactualizado. Recalculando en vivo desde dias_data con la función
+    // vigente, la Liquidación siempre refleja la lógica más reciente, sin
+    // importar cuándo se guardó esa Asistencia.
+    const { data: asis } = await sb.from('asistencia_mensual').select('dias_data')
       .eq('trabajador_id', trabajadorId).eq('anio', anioActualLiq).eq('mes', mesActualLiq).maybeSingle();
-    if (asis && asis.resumen) {
-      const r = asis.resumen;
+    if (asis && asis.dias_data && asis.dias_data.length) {
+      const r = consolidarResumenMensual(asis.dias_data, t);
       document.getElementById('d-trab').value = r.diasTrab ?? 0;
       document.getElementById('d-aus').value = r.diasAusentes ?? 0;
       document.getElementById('hrs-desc').value = Number((r.hrsDescTotal ?? 0).toFixed(2));
       document.getElementById('hrs-ext').value = Number((r.hrsExt ?? 0).toFixed(2));
       document.getElementById('val-hora').value = Math.round(r.valHora ?? 0);
-      document.getElementById('l-status').textContent = 'Días y horas autocompletados desde la Asistencia guardada de este mes (puedes ajustarlos).';
+      document.getElementById('l-status').textContent = 'Días y horas recalculados en vivo desde el Registro diario de Asistencia de este mes (puedes ajustarlos).';
     } else {
       document.getElementById('d-trab').value = 0;
+      document.getElementById('d-aus').value = 0;
       document.getElementById('hrs-desc').value = 0;
       document.getElementById('hrs-ext').value = 0;
       document.getElementById('val-hora').value = 0;

@@ -249,9 +249,11 @@
         <div class="card" style="overflow-x:auto;">
           <div class="section-title">
             <span>Resumen semanal</span>
-            <button class="btn-secondary btn-small" style="margin:0;" onclick="recalcularResumenSemanal()">🔄 Recalcular y Validar Semana</button>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="btn-secondary btn-small" style="margin:0;" onclick="abrirInfoResumenSemanal()">ℹ️ Cómo se calcula</button>
+              <button class="btn-secondary btn-small" style="margin:0;" onclick="recalcularResumenSemanal()">🔄 Recalcular y Validar Semana</button>
+            </div>
           </div>
-          <p class="hint" style="margin-bottom:10px;">Las horas extra de la semana (lunes a domingo) cubren primero las horas de descuento de esa misma semana — cada día ya calculó su propio descuento contra su propio horario, así que esta compensación es directa: extra de la semana menos descuento de la semana. Esto funciona igual en semanas completas y en semanas "mochas" (⚠️) que quedan a caballo entre el fin y el inicio de mes. Las columnas "→ Extra final" y "→ Descuento final" ya son el resultado después de aplicar esta compensación — son las que se usan en la liquidación. Las horas trabajadas en días que <strong>no son parte del horario semanal contratado</strong> (ej. domingo) nunca compensan descuentos — siempre pasan directas como "Extra fuera de horario".</p>
           <table class="dias-table">
             <thead>
               <tr>
@@ -267,6 +269,21 @@
             </thead>
             <tbody id="a-tabla-semanas"></tbody>
           </table>
+        </div>
+
+        <!-- POPUP: explicación del cálculo del Resumen semanal (oculto, nunca se imprime) -->
+        <div class="modal-overlay no-print-asis" id="info-resumen-semanal-modal" style="display:none;" onclick="cerrarInfoResumenSemanal()">
+          <div class="modal-box" onclick="event.stopPropagation()">
+            <div class="modal-header">
+              <span>Cómo se calcula el Resumen semanal</span>
+              <button class="modal-close" onclick="cerrarInfoResumenSemanal()">✕</button>
+            </div>
+            <div class="modal-body">
+              <p>Las horas extra de la semana (lunes a domingo) cubren primero las horas de descuento de esa misma semana — cada día ya calculó su propio descuento contra su propio horario, así que esta compensación es directa: extra de la semana menos descuento de la semana. Esto funciona igual en semanas completas y en semanas "mochas" (⚠️) que quedan a caballo entre el fin y el inicio de mes.</p>
+              <p>Las columnas "→ Extra final" y "→ Descuento final" ya son el resultado después de aplicar esta compensación — son las que se usan en la liquidación.</p>
+              <p>Las horas trabajadas en días que <strong>no son parte del horario semanal contratado</strong> (ej. domingo) nunca compensan descuentos — siempre pasan directas como "Extra fuera de horario".</p>
+            </div>
+          </div>
         </div>
 
         <div class="card">

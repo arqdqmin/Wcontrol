@@ -411,6 +411,17 @@ function cambiarHoraAsis(i, campo, val) {
 // edición — este botón existe para que puedas forzarlo y confirmarlo
 // explícitamente cuando quieras estar 100% seguro de que lo que ves
 // coincide con el registro diario actual.
+// ---------- POPUP: explicación del Resumen semanal ----------
+function abrirInfoResumenSemanal() {
+  const modal = document.getElementById('info-resumen-semanal-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function cerrarInfoResumenSemanal() {
+  const modal = document.getElementById('info-resumen-semanal-modal');
+  if (modal) modal.style.display = 'none';
+}
+
 function recalcularResumenSemanal() {
   if (!trabajadorActualAsis || !diasDataAsis.length) {
     showToast('Primero carga la asistencia de un trabajador y mes', 'error');

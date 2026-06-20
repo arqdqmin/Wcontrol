@@ -236,11 +236,22 @@ input[type="checkbox"] { width: auto !important; accent-color: #1a1a1a; cursor: 
 .hist-delete-btn { flex-shrink: 0; border: none; background: transparent; cursor: pointer; font-size: 14px; padding: 4px 6px; border-radius: 6px; opacity: 0.55; line-height: 1; }
 .hist-delete-btn:hover { opacity: 1; background: #fcebeb; }
 
+/* ---------- MODAL / POPUP ---------- */
+.modal-overlay { position: fixed; inset: 0; background: rgba(20,20,18,0.45); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+.modal-box { background: #fff; border-radius: 14px; max-width: 560px; width: 100%; max-height: 80vh; overflow-y: auto; box-shadow: 0 10px 40px rgba(0,0,0,0.22); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #eee; font-weight: 700; font-size: 14px; color: #1a1a1a; }
+.modal-close { flex-shrink: 0; border: none; background: transparent; font-size: 17px; cursor: pointer; color: #888; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.modal-close:hover { color: #1a1a1a; background: #f0f0ec; }
+.modal-body { padding: 16px 20px 20px; font-size: 13px; line-height: 1.65; color: #444; }
+.modal-body p { margin: 0 0 12px; }
+.modal-body p:last-child { margin-bottom: 0; }
+
 /* ---------- IMPRESIÓN ---------- */
 @media print {
   body { background: #fff; color: #000; font-size: 12px; }
   .top-bar, .tabs, .info-box, .warn-box, .btn-primary, .btn-secondary, .toast { display: none !important; }
   .no-print-asis { display: none !important; }
+  .modal-overlay { display: none !important; }
   .panel:not(.active) { display: none !important; }
   .main { max-width: 100%; margin: 0; padding: 0; }
   .no-print { display: none !important; }

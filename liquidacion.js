@@ -20,6 +20,47 @@ function onTrabajadorChangeLiq() {
   }
 }
 
+// ---------- AUTOCOMPLETAR DÍAS/HORAS DESDE ASISTENCIA (reutilizable) ----------
+// Importante: se pide dias_data (el registro diario crudo), NO el "resumen"
+// guardado. El resumen es una foto fija calculada con la lógica vigente al
+// momento de guardar la Asistencia — si luego corregimos algo en el
+// cálculo, los meses guardados antes de esa corrección quedarían con un
+// resumen desactualizado. Recalculando en vivo desde dias_data con la
+// función vigente, la Liquidación siempre refleja la lógica más reciente,
+// sin importar cuándo se guardó esa Asistencia. Devuelve true si encontró
+// datos y completó los campos, false si no había Asistencia para ese mes.
+async function autocompletarDesdeAsistencia(trabajadorId, anio, mes, trabajador) {
+  const { data: asis } = await sb.from('asistencia_mensual').select('dias_data')
+    .eq('trabajador_id', trabajadorId).eq('anio', anio).eq('mes', mes).maybeSingle();
+
+  if (!asis || !asis.dias_data || !asis.dias_data.length) return false;
+
+  const r = consolidarResumenMensual(asis.dias_data, trabajador);
+  document.getElementById('d-trab').value = r.diasTrab ?? 0;
+  document.getElementById('d-aus').value = r.diasAusentes ?? 0;
+  document.getElementById('hrs-desc').value = Number((r.hrsDescTotal ?? 0).toFixed(2));
+  document.getElementById('hrs-ext').value = Number((r.hrsExt ?? 0).toFixed(2));
+  document.getElementById('val-hora').value = Math.round(r.valHora ?? 0);
+  return true;
+}
+
+// Botón "Recalcular desde Asistencia": funciona aunque ya exista una
+// liquidación guardada para este mes — trae los valores más recientes de
+// Asistencia sin tocar días de licencia/vacaciones (esos son manuales).
+async function recalcularDesdeAsistenciaLiq() {
+  if (!trabajadorActualLiq) {
+    showToast('Primero carga un trabajador y un mes', 'error');
+    return;
+  }
+  const ok = await autocompletarDesdeAsistencia(trabajadorActualLiq.id, anioActualLiq, mesActualLiq, trabajadorActualLiq);
+  if (!ok) {
+    showToast('No hay Asistencia guardada para este mes', 'error');
+    return;
+  }
+  document.getElementById('l-status').textContent = 'Días y horas actualizados desde el Registro diario de Asistencia (los días de licencia/vacaciones no se modificaron).';
+  showToast('Datos actualizados desde Asistencia ✓');
+}
+
 // ---------- CARGAR DATOS DEL TRABAJADOR / PERÍODO ----------
 async function cargarTrabajadorLiq() {
   const trabajadorId = document.getElementById('l-trabajador').value;
@@ -52,26 +93,11 @@ async function cargarTrabajadorLiq() {
     document.getElementById('hrs-desc').value = d.hrsDesc ?? 0;
     document.getElementById('hrs-ext').value = d.hrsExt ?? 0;
     document.getElementById('val-hora').value = d.valHora ?? 0;
-    document.getElementById('l-status').textContent = `Editando una liquidación ya guardada (actualizada ${new Date(liqExist.updated_at).toLocaleString('es-CL')}).`;
+    document.getElementById('l-status').textContent = `Editando una liquidación ya guardada (actualizada ${new Date(liqExist.updated_at).toLocaleString('es-CL')}). Si quieres traer los valores más recientes de Asistencia, usa "🔄 Recalcular desde Asistencia" abajo.`;
   } else {
     registroIdLiq = null;
-    // Importante: se pide dias_data (el registro diario crudo), NO el
-    // "resumen" guardado. El resumen es una foto fija calculada con la
-    // lógica vigente al momento de guardar la Asistencia — si luego
-    // corregimos algo en el cálculo (como hicimos varias veces), los meses
-    // guardados antes de esa corrección quedarían con un resumen
-    // desactualizado. Recalculando en vivo desde dias_data con la función
-    // vigente, la Liquidación siempre refleja la lógica más reciente, sin
-    // importar cuándo se guardó esa Asistencia.
-    const { data: asis } = await sb.from('asistencia_mensual').select('dias_data')
-      .eq('trabajador_id', trabajadorId).eq('anio', anioActualLiq).eq('mes', mesActualLiq).maybeSingle();
-    if (asis && asis.dias_data && asis.dias_data.length) {
-      const r = consolidarResumenMensual(asis.dias_data, t);
-      document.getElementById('d-trab').value = r.diasTrab ?? 0;
-      document.getElementById('d-aus').value = r.diasAusentes ?? 0;
-      document.getElementById('hrs-desc').value = Number((r.hrsDescTotal ?? 0).toFixed(2));
-      document.getElementById('hrs-ext').value = Number((r.hrsExt ?? 0).toFixed(2));
-      document.getElementById('val-hora').value = Math.round(r.valHora ?? 0);
+    const ok = await autocompletarDesdeAsistencia(trabajadorId, anioActualLiq, mesActualLiq, t);
+    if (ok) {
       document.getElementById('l-status').textContent = 'Días y horas recalculados en vivo desde el Registro diario de Asistencia de este mes (puedes ajustarlos).';
     } else {
       document.getElementById('d-trab').value = 0;
@@ -249,8 +275,35 @@ async function cargarHistLiq(trabajadorId) {
   if (error || !data || !data.length) { card.style.display = 'none'; return; }
   card.style.display = 'block';
   list.innerHTML = data.map(r => `
-    <div class="hist-item" onclick="document.getElementById('l-mes').selectedIndex=${r.mes}; document.getElementById('l-anio').value='${r.anio}'; cargarTrabajadorLiq();">
-      <span>${MESES_NOMBRES[r.mes]} ${r.anio}</span>
-      <span class="hist-meta">${r.datos && r.datos.sueldoLiquido ? fmtPesos(r.datos.sueldoLiquido) + ' · ' : ''}${new Date(r.updated_at).toLocaleDateString('es-CL')}</span>
+    <div class="hist-item">
+      <div style="flex:1; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="document.getElementById('l-mes').selectedIndex=${r.mes}; document.getElementById('l-anio').value='${r.anio}'; cargarTrabajadorLiq();">
+        <span>${MESES_NOMBRES[r.mes]} ${r.anio}</span>
+        <span class="hist-meta">${r.datos && r.datos.sueldoLiquido ? fmtPesos(r.datos.sueldoLiquido) + ' · ' : ''}${new Date(r.updated_at).toLocaleDateString('es-CL')}</span>
+      </div>
+      <button class="hist-delete-btn" title="Eliminar esta liquidación" onclick="event.stopPropagation(); eliminarLiquidacion('${trabajadorId}', ${r.mes}, ${r.anio});">🗑️</button>
     </div>`).join('');
+}
+
+// ---------- ELIMINAR UNA LIQUIDACIÓN GUARDADA ----------
+async function eliminarLiquidacion(trabajadorId, mes, anio) {
+  const confirmado = confirm(`¿Seguro que quieres eliminar la liquidación de ${MESES_NOMBRES[mes]} ${anio}? Esta acción no se puede deshacer.`);
+  if (!confirmado) return;
+
+  const { error } = await sb.from('liquidaciones').delete()
+    .eq('trabajador_id', trabajadorId).eq('anio', anio).eq('mes', mes);
+
+  if (error) { showToast('Error al eliminar: ' + error.message, 'error'); return; }
+
+  showToast('Liquidación eliminada ✓');
+  cargarHistLiq(trabajadorId);
+
+  // Si justo estábamos viendo esa liquidación, la recargamos para que ahora
+  // traiga los datos en vivo desde Asistencia en vez de quedar mostrando
+  // los campos de un registro que ya no existe.
+  if (trabajadorActualLiq && trabajadorActualLiq.id === trabajadorId &&
+      mesActualLiq === mes && anioActualLiq === anio) {
+    document.getElementById('l-mes').selectedIndex = mes;
+    document.getElementById('l-anio').value = String(anio);
+    await cargarTrabajadorLiq();
+  }
 }

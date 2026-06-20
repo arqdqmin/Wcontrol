@@ -346,8 +346,11 @@
           </div>
 
           <div class="card">
-            <div class="section-title">Días y horas del período</div>
-            <p class="hint" style="margin-bottom:10px;">Si ya generaste la Asistencia de este trabajador para este mes, estos campos vienen autocompletados — igual puedes ajustarlos a mano.</p>
+            <div class="section-title">
+              <span>Días y horas del período</span>
+              <button class="btn-secondary btn-small" style="margin:0;" onclick="recalcularDesdeAsistenciaLiq()">🔄 Recalcular desde Asistencia</button>
+            </div>
+            <p class="hint" style="margin-bottom:10px;">Si ya generaste la Asistencia de este trabajador para este mes, estos campos vienen autocompletados — igual puedes ajustarlos a mano. Si estás editando una liquidación ya guardada, el botón de arriba trae los valores más recientes de Asistencia sin perder los días de licencia/vacaciones que hayas puesto acá.</p>
             <div class="grid-3">
               <div class="field"><label>Días trabajados</label><input type="number" id="d-trab" min="0" max="31" /></div>
               <div class="field"><label>Días de licencia</label><input type="number" id="d-lic" value="0" min="0" /></div>

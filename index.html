@@ -248,16 +248,18 @@
 
         <div class="card" style="overflow-x:auto;">
           <div class="section-title">Resumen semanal</div>
-          <p class="hint" style="margin-bottom:10px;">Las horas extra solo cubren horas de descuento dentro de la misma semana (lunes a domingo), para cuadrar las 42 hrs semanales. Si en una semana el descuento no queda cubierto por extras, ese remanente pasa directo a la liquidación como descuento; si sobran extras, pasan directo como extra. Las horas trabajadas en días que <strong>no son parte del horario semanal contratado</strong> (ej. día libre) nunca compensan descuentos — siempre pasan directas a la liquidación como "Extra fuera de horario".</p>
+          <p class="hint" style="margin-bottom:10px;">Las horas extra solo cubren horas de descuento dentro de la misma semana (lunes a domingo), comparando contra la meta semanal del contrato. Si una semana queda "mocha" por empezar o terminar el mes a medio camino (⚠️), la meta se prorratea según cuántos días contractuales de esa semana caen dentro de este mes. Las columnas "Extra final" y "Descuento final" ya son el resultado después de aplicar esta compensación — son las que se usan en la liquidación. Las horas trabajadas en días que <strong>no son parte del horario semanal contratado</strong> (ej. domingo) nunca compensan descuentos — siempre pasan directas como "Extra fuera de horario".</p>
           <table class="dias-table">
             <thead>
               <tr>
                 <th>Semana</th>
+                <th>Días / Meta</th>
                 <th>Horas normales</th>
                 <th>Horas extra</th>
                 <th>Extra fuera de horario</th>
                 <th>Horas descuento</th>
-                <th>Extra − Descuento</th>
+                <th>→ Extra final</th>
+                <th>→ Descuento final</th>
               </tr>
             </thead>
             <tbody id="a-tabla-semanas"></tbody>

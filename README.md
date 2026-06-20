@@ -22,7 +22,31 @@ la información se guarda en **Supabase** y la app se aloja gratis en
 Cada trabajador tiene su propio historial de meses guardados, visible en
 ambas pestañas.
 
-## Novedades de esta versión
+## Novedades de esta versión — corrección de bugs críticos reportados (Mayo 2026)
+
+Reescribí por completo la consolidación mensual/semanal en una sola función
+(`consolidarResumenMensual`), que reemplaza todo lo anterior. Corrige los 3
+problemas reportados:
+
+1. **Semanas parciales de inicio/fin de mes** (ej. el mes empieza un
+   viernes): antes la meta de 42h se aplicaba completa aunque la semana solo
+   tuviera 1 o 2 días dentro del mes, dando descuentos absurdos como "-36".
+   Ahora la meta se prorratea según cuántos días contractuales de esa semana
+   sí caen dentro del mes (ej. 2 de 5 días → meta de 16,8h en vez de 42h). En
+   "Resumen semanal" vas a ver una ⚠️ en las semanas detectadas como
+   parciales, con el detalle de días/meta usada.
+2. **Licuadora no se aplicaba correctamente**: ahora extra y descuento de la
+   misma semana nunca se muestran "sueltos" — uno de los dos siempre queda
+   en 0 una vez aplicada la compensación. Agregué dos columnas nuevas a la
+   tabla ("→ Extra final" y "→ Descuento final") para que sea inconfundible
+   cuál es el resultado que efectivamente se usa en la liquidación, separado
+   de las columnas de horas "en bruto" (antes de compensar).
+3. **Desfase entre la pantalla diaria y el resumen semanal**: ahora ambos se
+   calculan en una sola pasada, reutilizando exactamente el mismo cálculo
+   por día — estructuralmente ya no es posible que la tabla diaria y el
+   resumen semanal muestren números distintos para los mismos días.
+
+## Novedades de la versión anterior
 
 - **Refactor de la compensación semanal (`consolidarSemana`)**: antes el
   sistema comparaba la suma de horas extra diarias contra la suma de horas

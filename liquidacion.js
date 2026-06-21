@@ -69,7 +69,7 @@ async function cargarTrabajadorLiq() {
   if (!t) { showToast('Trabajador no encontrado', 'error'); return; }
 
   trabajadorActualLiq = t;
-  mesActualLiq = document.getElementById('l-mes').selectedIndex;
+  mesActualLiq = Number(document.getElementById('l-mes').value);
   anioActualLiq = Number(document.getElementById('l-anio').value);
 
   document.getElementById('lr-nombre').textContent = t.nombre || '';
@@ -135,7 +135,7 @@ function calcularLiq() {
 
   const montoHrsDesc = Math.round(hrsDesc * valHora);
   const montoHrsExt = Math.round(hrsExt * valHora * 1.5);
-  const sueldoProp = Math.round((sbase / 30) * dTrab) - montoHrsDesc;
+  const sueldoProp = Math.max(0, Math.round((sbase / 30) * dTrab) - montoHrsDesc);
   const gratifMensual = Math.round((sueldoProp + montoHrsExt) / 4);
   const totalImponible = sueldoProp + montoHrsExt + gratifMensual;
   const totalAfp = Math.round(totalImponible * (tasaAfp + afpAdic) / 100);
@@ -170,7 +170,7 @@ function calcularLiq() {
 }
 
 // ---------- VISTA DE IMPRESIÓN + GUARDADO ----------
-function mostrarImpresionLiq() {
+async function mostrarImpresionLiq() {
   if (!lastCalc) { showToast('Primero calcula la liquidación', 'error'); return; }
   const t = trabajadorActualLiq;
   const c = lastCalc;
@@ -231,7 +231,7 @@ function mostrarImpresionLiq() {
   `;
   document.getElementById('liq-content').innerHTML = html;
 
-  guardarLiquidacionDB();
+  await guardarLiquidacionDB();
 
   document.getElementById('liq-panel-datos').style.display = 'none';
   document.getElementById('vista-impresion').classList.add('visible');

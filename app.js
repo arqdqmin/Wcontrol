@@ -160,7 +160,7 @@ function poblarSelectsTrabajador() {
 }
 
 function getTrabajadorById(id) {
-  return trabajadoresCache.find(t => t.id === id) || null;
+  return trabajadoresCache.find(t => String(t.id) === String(id)) || null;
 }
 
 window.addEventListener('DOMContentLoaded', checkSession);
